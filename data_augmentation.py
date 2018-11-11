@@ -1,6 +1,7 @@
 from torchvision import transforms
 from PIL import Image
 import glob
+import os
 import logging
 logging.basicConfig(
     format='%(asctime)s : %(levelname)s : %(message)s',
@@ -14,28 +15,36 @@ Std_crop = transforms.RandomResizedCrop(128, (1, 1), (1, 1))
 Crop = transforms.RandomResizedCrop(128, (0.5, 1))
 
 errcount = 0
-for fd in ['togobox', 'coffeecups', 'ffwrapper', 'juicebox', 'snackpackage']:
+
+#for fd in ['togobox', 'coffeecups', 'ffwrapper', 'juicebox', 'snackpackage']:
+#for fd in ['popcan', 'glassbottle', 'perishable']:
+for fd in ['plasticbag', 'newspaper', 'plasticbottle']:
+    os.mkdir('./data/{}/'.format(fd))
+
     imgcount = 0
-    logging.info('Currently at {}'.format(fd))
-    image_list = []
+    logging.info('Currently at class {}'.format(fd))
+    #image_list = []
     for fmt in ['jpg', 'jpeg', 'png']:
-        logging.info('- at {}'.format(fmt))
-        if imgcount % 100 == 1:
-            logging.info('--at {}th image'.format(imgcount))
-        if imgcount == 1000:
-            break
-        for filename in glob.glob('./data/pre_{}/*.{}'.format(fd, fmt)):
+        logging.info('-- at format {}'.format(fmt))
+
+        for filename in glob.glob('../ImageNet_Utils/{}/*.{}'.format(fd, fmt)):
+
+            if imgcount % 100 == 1:
+                logging.info('--at {}st image'.format(imgcount))
+
             im = Image.open(filename)
-            # image_list.append(Std_crop(im))
+
+            #image_list.append(Std_crop(im))
             try:
-                for i in range(4):
+                for i in range(2):
                     imafterjit = Jitter(im)
-                    for j in range(2):
+                    for j in range(4):
                         imafteraf = Affine(imafterjit)
-                        for k in range(5):
+                        for k in range(2):
                             img = Crop(imafteraf)
                             imgcount += 1
                             img.save('./data/{}/{}{}.png'.format(fd, fd, imgcount))
+
             except ValueError as e:
                 errcount += 1
                 print(errcount, e)
