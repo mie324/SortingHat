@@ -15,11 +15,14 @@ def save_img(fd, pm):
             img = img.crop((0, d, x, y - d))
         else:
             img = img.crop((d, 0, x - d, y))
-        img.resize((128, 128), Image.BILINEAR).save('./images_Google/{}/{}{}.png'.format(pm[0], pm[1], i))
+        img.resize((128, 128), Image.BILINEAR).save('./images_Google/{}/{}{}.png'.format(pm, pm, i))
 
 
 if __name__ == "__main__":
-    folder = 'paper coffee cups -art'
-    params = ('coffeecups', 'cp')
+    folder = 'fast food (wax OR foil) paper'
+    params = 'fastfoodandwrapper'
+    # for folder, params in [('n00021265_food', 'food'), ('n03958227_plastic_bag', 'plasticbag'),
+    #                        ('n03983396_glass_bottle', 'glassbottles'), ('n06267145_newspaper', 'newspaper'),
+    #                        ('n07927512_popcan', 'popcan')]:
     save_img(folder, params)
 
