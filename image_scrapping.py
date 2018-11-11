@@ -9,7 +9,7 @@ response = google_images_download.googleimagesdownload()
 
 arguments = {"keywords": "take out box",
              "limit": 500, "print_urls": True,
-             "chromedriver": "C:\\Users\\iatey\\PycharmProjects\\mie324\\SortingHat\\chromedriver.exe",
+             "chromedriver": "C:\\Users\\iatey\\PycharmProjects\\mie324\\chromedriver.exe",
              "output_directory": './SortingHat/images_Google'}
 # passing the arguments to the function
 paths = response.download(arguments)
