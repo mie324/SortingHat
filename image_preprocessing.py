@@ -19,8 +19,8 @@ def save_img(fd, pm):
 
 
 if __name__ == "__main__":
-    folder = 'fast food (wax OR foil) paper'
-    params = 'fastfoodandwrapper'
+    fd = 'fast food (wax OR foil) paper'
+    pm = 'fastfoodandwrapper'
     # for folder, params in [('n00021265_food', 'food'), ('n03958227_plastic_bag', 'plasticbag'),
     #                        ('n03983396_glass_bottle', 'glassbottles'), ('n06267145_newspaper', 'newspaper'),
     #                        ('n07927512_popcan', 'popcan')]:
