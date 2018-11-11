@@ -16,8 +16,8 @@ Crop = transforms.RandomResizedCrop(128, (0.5, 1))
 
 errcount = 0
 
-#for fd in ['togobox', 'coffeecups', 'ffwrapper', 'juicebox', 'snackpackage']:
-#for fd in ['popcan', 'glassbottle', 'perishable']:
+# for fd in ['togobox', 'coffeecups', 'ffwrapper', 'juicebox', 'snackpackage']:
+# for fd in ['popcan', 'glassbottle', 'perishable']:
 for fd in ['plasticbag', 'newspaper', 'plasticbottle']:
     os.mkdir('./data/{}/'.format(fd))
 

@@ -1,75 +1,117 @@
 import torch.optim as optim
 import torch.nn as nn
-import torchvision.transforms as transforms
-import scipy.signal as signal
+import torch
+# import torchvision.transforms as transforms
+
+import pandas as pd
 import numpy as np
 import argparse
-import glob
+import time
 
-from PIL import Image
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
+# from PIL import Image
+# from torch.utils.data import DataLoader
+# from sklearn.model_selection import train_test_split
 
 from model import CNN
+from util import *
+from result_visualization import *
+# from dataset import Dataset
 
 
-classes = ('snackpackage', 'juicebox', 'coffeecup', 'togobox', 'popcan', 'glassbottle',
-           'plasticbottle', 'perishable', 'plasticbag', 'newspaper')
-
-transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-
-
-# Data processing
-data =
-
+# classes = {'snackpackage': 0, 'juicebox': 1, 'coffeecup': 2, 'togobox': 3, 'popcan': 4, 'glassbottle': 5,
+#            'plasticbottle': 6, 'perishable': 7, 'plasticbag': 8, 'newspaper': 9, 'ffwrapper': 10}
 
 
 def main(args):
-    loss_fcn = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(CNN.parameters(), lr=args.lr)
-
-    train_err = np.zeros(args.num_epochs)
+    train_acc = np.zeros(args.num_epochs)
     train_loss = np.zeros(args.num_epochs)
-    val_err = np.zeros(args.num_epochs)
+    val_acc = np.zeros(args.num_epochs)
     val_loss = np.zeros(args.num_epochs)
 
+    # Data processing
+    train_loader, val_loader = get_train_val_loader(args.batch_size)
 
-    dataset =
-    trainset, valset =
+    model = CNN()
+    loss_fcn = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True)
-
-    val_loader = DataLoader(valset, batch_size=args.batch_size, shuffle=False)
-
-    for epoch in range(args.num_epochs):  # loop over the dataset multiple times
-
-        running_loss = 0.0
+    start_time = time.time()
+    for epoch in range(args.num_epochs):
+        accum_loss = 0.0
+        num_trained = 0
+        tot_corr = 0
         for i, data in enumerate(train_loader, 0):
-            # get the inputs
             inputs, labels = data
-
-            # zero the parameter gradients
             optimizer.zero_grad()
-
-            # forward + backward + optimize
-            outputs = cnn(inputs)
-            loss = loss_fcn(outputs, labels)
+            predictions = model(inputs)
+            loss = loss_fcn(predictions, labels)
 
             # magic
             loss.backward()
             optimizer.step()
 
-            # print statistics
-            running_loss += loss.item()
-            if i % args.eval_every == args.eval_every-1:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+            # count correct predictions
+            accum_loss += loss.item()
+            _, predicted = torch.max(predictions, 1)
+            corr = (predicted.double() == labels).sum().item()
+            tot_corr += corr
 
-    print('Finished Training')
+            num_trained += len(labels)
+
+        # Print statistics
+        valid_acc, valid_loss = evaluate(model, val_loader, loss_fcn)
+        train_acc[epoch] = tot_corr * 100 / num_trained
+        train_loss[epoch] = accum_loss / (i + 1)
+        val_acc[epoch] = valid_acc*100
+        val_loss[epoch] = valid_loss
+
+        print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
+              (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
+
+    print('Finished training:\n',
+          'train accuracy:', max(train_acc), 'train loss:', min(train_loss), '\n',
+          'validation accuracy:', max(val_acc), 'validation loss:', min(val_loss), '\n')
+
+    # plotting related
+    time_elapsed = time.time() - start_time
+
+    # torch.save(model, model_config + '_BEST88.pt')
+    #
+    # # Write the train/test loss/err into CSV file for plotting later
+    # indices = np.arange(1, step_length + 1)
+    #
+    # df = pd.DataFrame({"steps": indices, "train_acc": train_acc})
+    # df.to_csv("./csv/train_acc_{}.csv".format(model_config), index=False)
+    #
+    # df = pd.DataFrame({"steps": indices, "val_acc": val_acc})
+    # df.to_csv("./csv/val_acc_{}.csv".format(model_config), index=False)
+    #
+    # train_plot, val_plot = load_csv(model_config)
+    # plot_graph(model_config, train_plot, val_plot, eval_every)
+
+    # print("lr={}, batch_size={}, hidden_size={}, func={}".format(lr, batch_size, hidden_size, func))
+    # print("max validation accuracy:", max(val_acc))
+    print("time elapsed:", time_elapsed)
+
+
+def evaluate(model, val_loader, lossfcn):
+    total_corr = 0
+    accum_loss = 0
+
+    for j, vbatch in enumerate(val_loader):
+        (x, x_lengths), labels = vbatch.text, vbatch.label
+        prediction = model(x, x_lengths)
+        _, predicted = torch.max(prediction, 1)
+        corr = (predicted.double() == labels).sum().item()
+        total_corr += corr
+
+        loss = lossfcn(prediction, labels.float())
+        loss.backward()
+        accum_loss += loss.item()
+
+    length = len(val_loader.dataset)
+
+    return float(total_corr)/length, float(accum_loss/(j+1))
 
 
 if __name__ == "__main__":

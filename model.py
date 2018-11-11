@@ -3,14 +3,14 @@ import torch
 
 
 class CNN(nn.Module):
-    def __init__(self, num_kernels=(6, 16), kernel_size=(5, 5)):
+    def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, num_kernels[0], kernel_size[0])
+        self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, num_kernels[1], kernel_size[1])
+        self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.fc3 = nn.Linear(84, 11)
 
     def forward(self, x):
         x = self.pool(torch.relu(self.conv1(x)))
