@@ -16,27 +16,27 @@ from model import CNN
 from util import *
 from result_visualization import *
 # from dataset import Dataset
-
-
-# classes = {'snackpackage': 0, 'juicebox': 1, 'coffeecup': 2, 'togobox': 3, 'popcan': 4, 'glassbottle': 5,
-#            'plasticbottle': 6, 'perishable': 7, 'plasticbag': 8, 'newspaper': 9, 'ffwrapper': 10}
-
+from datetime import datetime
+from sklearn.metrics import confusion_matrix
 
 def main(args):
-    train_acc = np.zeros(args.num_epochs)
-    train_loss = np.zeros(args.num_epochs)
-    val_acc = np.zeros(args.num_epochs)
-    val_loss = np.zeros(args.num_epochs)
+    train_acc = np.zeros(args.epochs)
+    train_loss = np.zeros(args.epochs)
+    val_acc = np.zeros(args.epochs)
+    val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(args.batch_size)
+    train_loader, val_loader = get_train_val_loader(args.batch_size, debug=False)
+    logging.info('loaders loaded')
 
     model = CNN()
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    logging.info('good sofar')
     start_time = time.time()
-    for epoch in range(args.num_epochs):
+    for epoch in range(args.epochs):
+        logging.info('epoch{}'.format(epoch))
         accum_loss = 0.0
         num_trained = 0
         tot_corr = 0
@@ -44,7 +44,7 @@ def main(args):
             inputs, labels = data
             optimizer.zero_grad()
             predictions = model(inputs)
-            loss = loss_fcn(predictions, labels)
+            loss = loss_fcn(predictions, labels.long())
 
             # magic
             loss.backward()
@@ -53,19 +53,21 @@ def main(args):
             # count correct predictions
             accum_loss += loss.item()
             _, predicted = torch.max(predictions, 1)
-            corr = (predicted.double() == labels).sum().item()
+            corr = (predicted == labels.long()).sum().item()
             tot_corr += corr
 
             num_trained += len(labels)
 
         # Print statistics
-        valid_acc, valid_loss = evaluate(model, val_loader, loss_fcn)
+        valid_acc, valid_loss = evaluate(model, val_loader, loss_fcn, epoch)
         train_acc[epoch] = tot_corr * 100 / num_trained
         train_loss[epoch] = accum_loss / (i + 1)
         val_acc[epoch] = valid_acc*100
         val_loss[epoch] = valid_loss
 
         print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
+              (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
+        logger.info('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
               (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
 
     print('Finished training:\n',
@@ -91,37 +93,53 @@ def main(args):
 
     # print("lr={}, batch_size={}, hidden_size={}, func={}".format(lr, batch_size, hidden_size, func))
     # print("max validation accuracy:", max(val_acc))
+    
     print("time elapsed:", time_elapsed)
+    
+    now = datetime.now()
+    torch.save(model, 'model_{:02d}{:02d}_{:02d}{:02d}.pt'.format(now.month, now.day, now.hour, now.minute))
+
+    #logging.info('generating confusion matrix')
 
 
-def evaluate(model, val_loader, lossfcn):
+def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
     total_corr = 0
     accum_loss = 0
+    y_true, y_pred = [], []
 
-    for j, vbatch in enumerate(val_loader):
-        (x, x_lengths), labels = vbatch.text, vbatch.label
-        prediction = model(x, x_lengths)
-        _, predicted = torch.max(prediction, 1)
-        corr = (predicted.double() == labels).sum().item()
+    for j, data in enumerate(val_loader):
+        inputs, labels = data
+
+        predictions = model(inputs)
+        _, predicted = torch.max(predictions, 1)
+        loss = loss_fcn(predictions, labels.long())
+
+        y_true.append(labels.tolist())
+        y_pred.append(predicted.tolist())
+
+        corr = (predicted == labels.long()).sum().item()
         total_corr += corr
 
-        loss = lossfcn(prediction, labels.float())
-        loss.backward()
         accum_loss += loss.item()
 
+    if gen_conf_mat:
+        cm = confusion_matrix(y_true, y_pred)
+        plot_confusion_matrix(epoch, cm, CLASSES_itos)
+
     length = len(val_loader.dataset)
+
 
     return float(total_corr)/length, float(accum_loss/(j+1))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=25)
-    parser.add_argument('--eval_every', type=int, default=64)
-    parser.add_argument('--kernel-size', type=int, default=5)
-    parser.add_argument('--num-kernels', type=int, default=50)
+    # parser.add_argument('--eval_every', type=int, default=64)
+    # parser.add_argument('--kernel-size', type=int, default=5)
+    # parser.add_argument('--num-kernels', type=int, default=50)
 
     args = parser.parse_args()
 
