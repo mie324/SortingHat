@@ -3,6 +3,8 @@ import torchvision.transforms as transforms
 import numpy as np
 import os
 import itertools
+from matplotlib import use
+use('Agg')
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -38,7 +40,7 @@ def get_train_val_loader(bs=64, debug=False):
         bs = 16
     else:
         num_data = 8000
-    print('debug is ', debug)
+    logging.info('debug is {}'.format(debug))
     transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -147,19 +149,19 @@ def plot_confusion_matrix(fname, cm, classes,
         title: String for the title of the plot
         cmap: Colour map for the plot
     """
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
-    else:
-        print('Confusion matrix, without normalization')
-    print(cm)
+    # if normalize:
+    #     cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    #     print("Normalized confusion matrix")
+    # else:
+    #     print('Confusion matrix, without normalization')
+    # print(cm)
 
     plt.figure()
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
     plt.colorbar()
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
+    plt.xticks(tick_marks, classes, rotation=90)
     plt.yticks(tick_marks, classes)
 
     fmt = '.2f' if normalize else 'd'

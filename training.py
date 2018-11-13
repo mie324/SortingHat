@@ -26,7 +26,7 @@ def main(args):
     val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(args.batch_size, debug=False)
+    train_loader, val_loader = get_train_val_loader(args.batch_size, debug=args.debug)
     logging.info('loaders loaded')
 
     model = CNN()
@@ -36,7 +36,7 @@ def main(args):
     logging.info('good sofar')
     start_time = time.time()
     for epoch in range(args.epochs):
-        logging.info('epoch{}'.format(epoch))
+        logging.info('epoch {} ...'.format(epoch+1))
         accum_loss = 0.0
         num_trained = 0
         tot_corr = 0
@@ -67,7 +67,7 @@ def main(args):
 
         print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
               (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
-        logger.info('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
+        logging.info('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
               (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
 
     print('Finished training:\n',
@@ -114,8 +114,8 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
         _, predicted = torch.max(predictions, 1)
         loss = loss_fcn(predictions, labels.long())
 
-        y_true.append(labels.tolist())
-        y_pred.append(predicted.tolist())
+        y_true.extend(labels.tolist())
+        y_pred.extend(predicted.tolist())
 
         corr = (predicted == labels.long()).sum().item()
         total_corr += corr
@@ -124,7 +124,7 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
 
     if gen_conf_mat:
         cm = confusion_matrix(y_true, y_pred)
-        plot_confusion_matrix(epoch, cm, CLASSES_itos)
+        plot_confusion_matrix('debug{}'.format(epoch), cm, CLASSES_itos)
 
     length = len(val_loader.dataset)
 
@@ -137,6 +137,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=25)
+    parser.add_argument('--debug', type=bool, default=False)
     # parser.add_argument('--eval_every', type=int, default=64)
     # parser.add_argument('--kernel-size', type=int, default=5)
     # parser.add_argument('--num-kernels', type=int, default=50)
