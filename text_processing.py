@@ -14,6 +14,7 @@ KEYWORDS = {'snacks': 0, 'chips': 1, 'wrapper': 2, 'snacks packaging': 3,
             'newspaper': 20, 'paper': 21, 'paper tray': 22, 'napkins': 23,
             'coffee cup': 30, 'tim hortons': 31, 'starbucks': 32, 'coffee': 33
             }
+CATEGORIES = ['landfill', 'containers', 'paper', 'coffee cups']
 KEYWORDS_rev = {val:key for key, val in KEYWORDS.items()}
 keywords_mat = np.zeros([len(KEYWORDS), 301]) # first dim is waste code, rest 300 vector
 for i, (phrase, wc) in enumerate(KEYWORDS.items()):
@@ -50,5 +51,5 @@ while True:
                 max_sim = sim
                 max_lb = row[0]
 
-        print("I think '{}' is the closest to '{}', with similarity {:.4f}\n".format(
-            my_phrase, KEYWORDS_rev[max_lb], max_sim))
+        print("--> I think '{}' is the closest to '{}' (similarity {:.4f}), so it should go in {}\n".format(
+            my_phrase, KEYWORDS_rev[max_lb], max_sim, CATEGORIES[int(max_lb//10)]))
