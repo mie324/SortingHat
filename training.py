@@ -19,6 +19,7 @@ from result_visualization import *
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
+
 def main(args):
     train_acc = np.zeros(args.epochs)
     train_loss = np.zeros(args.epochs)

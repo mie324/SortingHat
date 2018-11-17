@@ -36,8 +36,7 @@ class WasteDataset(Dataset):
 
 def get_train_val_loader(bs=64, debug=False):
     if debug:
-        num_data = 200
-        bs = 16
+        num_data = 1000
     else:
         num_data = 8000
     logging.info('debug is {}'.format(debug))

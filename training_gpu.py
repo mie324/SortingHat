@@ -19,7 +19,7 @@ from result_visualization import *
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
-cuda0 = torch.device('cuda:0')
+cuda0 = torch.device('cuda')  #DEBUG
 def main(args):
     train_acc = np.zeros(args.epochs)
     train_loss = np.zeros(args.epochs)
@@ -30,7 +30,7 @@ def main(args):
     train_loader, val_loader = get_train_val_loader(args.batch_size, debug=args.debug)
     logging.info('loaders loaded')
 
-    model = CNN()
+    model = CNN().cuda(cuda0)
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
@@ -43,8 +43,12 @@ def main(args):
         tot_corr = 0
         for i, data in enumerate(train_loader, 0):
             inputs, labels = data
+            inputs = inputs.to(cuda0)
+            labels = labels.to(cuda0)
+
             optimizer.zero_grad()
             predictions = model(inputs)
+            #print(predictions.shape)
             loss = loss_fcn(predictions, labels.long())
 
             # magic
@@ -60,14 +64,15 @@ def main(args):
             num_trained += len(labels)
 
         # Print statistics
-        valid_acc, valid_loss = evaluate(model, val_loader, loss_fcn, epoch)
+        valid_acc, valid_loss = evaluate(model.eval(), val_loader, loss_fcn, epoch)
+        model = model.train()
         train_acc[epoch] = tot_corr * 100 / num_trained
         train_loss[epoch] = accum_loss / (i + 1)
         val_acc[epoch] = valid_acc*100
         val_loss[epoch] = valid_loss
 
-        print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
-              (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
+        # print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
+        #       (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
         logging.info('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
               (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
 
@@ -94,9 +99,9 @@ def main(args):
 
     # print("lr={}, batch_size={}, hidden_size={}, func={}".format(lr, batch_size, hidden_size, func))
     # print("max validation accuracy:", max(val_acc))
-    
+
     print("time elapsed:", time_elapsed)
-    
+
     now = datetime.now()
     torch.save(model, 'model_{:02d}{:02d}_{:02d}{:02d}.pt'.format(now.month, now.day, now.hour, now.minute))
 
@@ -110,6 +115,8 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
 
     for j, data in enumerate(val_loader):
         inputs, labels = data
+        inputs = inputs.to(cuda0)
+        labels = labels.to(cuda0)
 
         predictions = model(inputs)
         _, predicted = torch.max(predictions, 1)
@@ -123,7 +130,7 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
 
         accum_loss += loss.item()
 
-    if gen_conf_mat:
+    if gen_conf_mat and epoch%10==0:
         cm = confusion_matrix(y_true, y_pred)
         plot_confusion_matrix('debug{}'.format(epoch), cm, CLASSES_itos)
 
@@ -137,8 +144,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--epochs', type=int, default=25)
-    parser.add_argument('--debug', type=bool, default=False)
+    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--debug', type=bool, default=True)
     # parser.add_argument('--eval_every', type=int, default=64)
     # parser.add_argument('--kernel-size', type=int, default=5)
     # parser.add_argument('--num-kernels', type=int, default=50)
