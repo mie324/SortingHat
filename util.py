@@ -1,4 +1,4 @@
-import torchvision 
+import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import os
@@ -17,9 +17,13 @@ logging.basicConfig(
 CLASSES = {'plasticbottle':0, 'newspaper':1, 'plasticbag':2, 'perishable':3,
             'glassbottle':4, 'popcan':5, 'juicebox':6, 'ffwrapper':7,
             'snackpackage':8, 'coffeecups':9, 'togobox':10}
+CLASSES4 = {'plasticbottle':1, 'newspaper':2, 'plasticbag':0, 'perishable':0,
+            'glassbottle':1, 'popcan':1, 'juicebox':1, 'ffwrapper':0,
+            'snackpackage':0, 'coffeecups':3, 'togobox':1, 'paper':2}
 CLASSES_itos = ['plasticbottle', 'newspaper', 'plasticbag', 'perishable',
             'glassbottle', 'popcan', 'juicebox', 'ffwrapper',
             'snackpackage', 'coffeecups', 'togobox']
+CLASSES4_itos = ['landfill', 'container', 'paper', 'coffeecups']
 
 class WasteDataset(Dataset):
 
@@ -33,24 +37,53 @@ class WasteDataset(Dataset):
     def __getitem__(self, index):
         return self.X[index], self.y[index]
 
+def stream_train_val_loader(bs=64, debug=False, fourclass=False):
+    from dataset import Dataset as WasteDataset
 
-def get_train_val_loader(bs=64, debug=False):
-    if debug:
-        num_data = 1000
+    if not fourclass:
+        num_data = 1000 if debug else 8000
     else:
-        num_data = 8000
-    logging.info('debug is {}'.format(debug))
+        num_data = 2000 if debug else 16000
+
+    classes = CLASSES4 if fourclass else CLASSES
+
+    clscode_to_numsample = [num_data // 4, num_data // 5, num_data // 2, num_data]  # used if fourclass
+
+    IDs = {}
+
+    for clsname, clscode in classes.items():
+        numsample = clscode_to_numsample[clscode] if fourclass else num_data
+        goodindices = []
+        numpics = len(os.listdir('./data/{}'.format(clsname)))
+        rnd_sample = np.random.permutation(np.arange(1, numpics + 1))
+        IDs[clscode] = rnd_sample
+
+
+
+    train_loader = DataLoader(WasteDataset(X_train, y_train), batch_size=bs, shuffle=True)
+    val_loader = DataLoader(WasteDataset(X_val, y_val), batch_size=bs, shuffle=False)
+    logging.info('loaders geenrated')
+    return train_loader, val_loader
+
+
+def get_train_val_loader(bs=64, debug=False, fourclass=False):
+    if not fourclass:
+        num_data = 1000 if debug else 8000
+    else:
+        num_data = 2000 if debug else 16000
+
+    logging.info('fourclass is {}, debug is {}'.format(fourclass, debug))
     transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    # pbot: 9696
-    # news: 12416
-    # pbag: 8532
-    # peri: 8584
+
     train_tensors, val_tensors = [], []
     train_labels, val_labels = [], []
 
-    for clsname, clscode in CLASSES.items():
+    classes = CLASSES4 if fourclass else CLASSES
+    clscode_to_numsample = [num_data//4, num_data//5, num_data//2, num_data]
+    for clsname, clscode in classes.items():
+        numsample = clscode_to_numsample[clscode] if fourclass else num_data
         #print('--- at {} ---'.format(clsname))
         numpics = len(os.listdir('./data/{}'.format(clsname)))
         #print(clsname, numpictures)
@@ -58,16 +91,17 @@ def get_train_val_loader(bs=64, debug=False):
 
         success=0
         for fnum in rnd_sample:  #0 -- 7999
+
             filename = './data/{}/{}{}.png'.format(clsname, clsname, fnum)
             im = Image.open(filename)
             imtensor = transform(im)
             if imtensor.shape != (3,128,128):
                 continue
 
-            if success < num_data*0.8:
+            if success < numsample*0.8:
                 train_tensors.append(imtensor)
                 train_labels.append(clscode)
-            elif success < num_data:
+            elif success < numsample:
                 val_tensors.append(imtensor)
                 val_labels.append(clscode)
             else:
@@ -96,7 +130,7 @@ def examine_pic_dimensions():
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    
+
     correct = 0
     fourchan = 0
     onechan = 0
@@ -181,5 +215,3 @@ def plot_confusion_matrix(fname, cm, classes,
 if __name__ == '__main__':
     get_train_val_loader(debug=True)
     #examine_pic_dimensions()
-
-
