@@ -19,7 +19,8 @@ from result_visualization import *
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
-cuda0 = torch.device('cuda')  #DEBUG
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 def main(args):
     train_acc = np.zeros(args.epochs)
     train_loss = np.zeros(args.epochs)
@@ -27,10 +28,12 @@ def main(args):
     val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(args.batch_size, debug=args.debug)
+    train_loader, val_loader = get_train_val_loader(
+        args.batch_size, debug=args.debug, fourclass=args.fourclass)
     logging.info('loaders loaded')
 
-    model = CNN().cuda(cuda0)
+    model = CNN().to(device)
+
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
@@ -43,8 +46,8 @@ def main(args):
         tot_corr = 0
         for i, data in enumerate(train_loader, 0):
             inputs, labels = data
-            inputs = inputs.to(cuda0)
-            labels = labels.to(cuda0)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
             optimizer.zero_grad()
             predictions = model(inputs)
@@ -64,7 +67,7 @@ def main(args):
             num_trained += len(labels)
 
         # Print statistics
-        valid_acc, valid_loss = evaluate(model.eval(), val_loader, loss_fcn, epoch)
+        valid_acc, valid_loss = evaluate(model.eval(), val_loader, loss_fcn, epoch, fourclass=args.fourclass)
         model = model.train()
         train_acc[epoch] = tot_corr * 100 / num_trained
         train_loss[epoch] = accum_loss / (i + 1)
@@ -73,7 +76,7 @@ def main(args):
 
         # print('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
         #       (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
-        logging.info('epoch: %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
+        logging.info('epoch %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
               (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
 
     print('Finished training:\n',
@@ -108,18 +111,18 @@ def main(args):
     #logging.info('generating confusion matrix')
 
 
-def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
+def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True, fourclass=False):
     total_corr = 0
     accum_loss = 0
     y_true, y_pred = [], []
 
     for j, data in enumerate(val_loader):
         inputs, labels = data
-        inputs = inputs.to(cuda0)
-        labels = labels.to(cuda0)
+        inputs = inputs.to(device)
+        labels = labels.to(device)
 
         predictions = model(inputs)
-        _, predicted = torch.max(predictions, 1)
+        _ , predicted = torch.max(predictions, 1)
         loss = loss_fcn(predictions, labels.long())
 
         y_true.extend(labels.tolist())
@@ -130,9 +133,10 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True):
 
         accum_loss += loss.item()
 
-    if gen_conf_mat and epoch%10==0:
+    if gen_conf_mat and epoch%10==9:
         cm = confusion_matrix(y_true, y_pred)
-        plot_confusion_matrix('debug{}'.format(epoch), cm, CLASSES_itos)
+        cls_itos = CLASSES4_itos if fourclass else CLASSES_itos
+        plot_confusion_matrix('debug{}'.format(epoch+1), cm, cls_itos)
 
     length = len(val_loader.dataset)
 
@@ -145,11 +149,11 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--debug', type=bool, default=True)
+    parser.add_argument('--debug', type=int, default=0)
+    parser.add_argument('--fourclass', type=int, default=0)
     # parser.add_argument('--eval_every', type=int, default=64)
     # parser.add_argument('--kernel-size', type=int, default=5)
     # parser.add_argument('--num-kernels', type=int, default=50)
 
     args = parser.parse_args()
-
     main(args)
