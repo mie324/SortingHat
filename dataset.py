@@ -2,17 +2,20 @@ import torch.utils.data as data
 
 
 class Dataset(data.Dataset):
-'''
-Trying to stream data from disk instead of storing everything in memory
-'''
-    def __init__(self, IDs, labels):
-        self.labels = labels
-        self.list_IDs = IDs  # a dictionary {classname: [ids]... } where ids contains only good pictures
+    '''
+    deprecated. implemented in util.py
+    '''
+    def __init__(self, IDs, numpics):
+        self.IDs = IDs  # a dictionary {classname: [ids]... } where ids contains only good pictures
+        self.numpics = numpics
 
     def __len__(self):
-        return len(self.IDs)
+        return len(self.IDs)*self.numpics
 
     def __getitem__(self, index):
-        ID = self.list_IDs[index]
+        y, localindex = index // self.numpics, index % self.numpics
 
-        return sample, label
+        picnum = self.IDs[y][localindex]
+
+        return X, y
+

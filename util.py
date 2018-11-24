@@ -37,8 +37,36 @@ class WasteDataset(Dataset):
     def __getitem__(self, index):
         return self.X[index], self.y[index]
 
+
+class WasteDatasetStream(Dataset):
+    '''
+    Trying to stream data from disk instead of storing everything in memory
+    '''
+
+    def __init__(self, IDs, numpics, fourclass=False):
+        self.IDs = IDs  # a dictionary {classname: [ids]... } where ids contains only good pictures
+        self.numpics = numpics
+        self.classes_itos = CLASSES4_itos if fourclass else CLASSES_itos
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+    def __len__(self):
+        return len(self.IDs) * self.numpics
+
+    def __getitem__(self, index):
+        clscode, localindex = index // self.numpics, index % self.numpics
+
+        picnum = self.IDs[clscode][localindex]
+        clsname = self.classes_itos[clscode]
+        filename = './data/{}/{}{}.png'.format(clsname, clsname, picnum)
+        im = Image.open(filename)
+        imtensor = self.transform(im)
+
+        return imtensor, clscode
+
+
 def stream_train_val_loader(bs=64, debug=False, fourclass=False):
-    from dataset import Dataset as WasteDataset
 
     if not fourclass:
         num_data = 1000 if debug else 8000
@@ -49,24 +77,29 @@ def stream_train_val_loader(bs=64, debug=False, fourclass=False):
 
     clscode_to_numsample = [num_data // 4, num_data // 5, num_data // 2, num_data]  # used if fourclass
 
-    IDs = {}
+    train_IDs = {}
+    val_IDs = {}
 
     for clsname, clscode in classes.items():
         numsample = clscode_to_numsample[clscode] if fourclass else num_data
         goodindices = []
-        numpics = len(os.listdir('./data/{}'.format(clsname)))
-        rnd_sample = np.random.permutation(np.arange(1, numpics + 1))
-        IDs[clscode] = rnd_sample
+        for fname in os.listdir('./data/{}'.format(clsname)):
+            if '_bad' not in fname:
+                goodindices.append( os.path.splitext(fname)[0].split(clsname)[1] ) # extract index
 
+        rnd_sample = np.random.permutation(goodindices)
+        train_IDs[clscode], val_IDs[clscode] = rnd_sample[:int(num_data*0.8)], rnd_sample[int(num_data*0.8):num_data]
 
-
-    train_loader = DataLoader(WasteDataset(X_train, y_train), batch_size=bs, shuffle=True)
-    val_loader = DataLoader(WasteDataset(X_val, y_val), batch_size=bs, shuffle=False)
-    logging.info('loaders geenrated')
+    train_loader = DataLoader(WasteDatasetStream(train_IDs, int(num_data*0.8), fourclass=fourclass), batch_size=bs, shuffle=False)
+    val_loader = DataLoader(WasteDatasetStream(val_IDs, int(num_data*0.2), fourclass=fourclass), batch_size=bs, shuffle=False)
+    logging.info('loaders generated')
     return train_loader, val_loader
 
 
-def get_train_val_loader(bs=64, debug=False, fourclass=False):
+def _get_train_val_loader(bs=64, debug=False, fourclass=False):
+    '''
+    kills memory
+    '''
     if not fourclass:
         num_data = 1000 if debug else 8000
     else:

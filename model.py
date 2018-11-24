@@ -58,5 +58,5 @@ class CNN(nn.Module):
         x = self.dropout(torch.relu(self.bnf2(self.fc2(x))))
         x = self.dropout(torch.relu(self.bnf3(self.fc3(x))))
         x = torch.softmax(self.fc4(x), dim=1)
-
+        print(x.get_device())
         return x

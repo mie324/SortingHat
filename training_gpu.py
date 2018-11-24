@@ -20,7 +20,7 @@ from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+print(device)
 def main(args):
     train_acc = np.zeros(args.epochs)
     train_loss = np.zeros(args.epochs)
@@ -28,7 +28,7 @@ def main(args):
     val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(
+    train_loader, val_loader = stream_train_val_loader(
         args.batch_size, debug=args.debug, fourclass=args.fourclass)
     logging.info('loaders loaded')
 
@@ -48,7 +48,7 @@ def main(args):
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
-
+            #print(inputs.get_device, labels.get_device)
             optimizer.zero_grad()
             predictions = model(inputs)
             #print(predictions.shape)
