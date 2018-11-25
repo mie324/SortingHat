@@ -26,7 +26,7 @@ for i, (phrase, wc) in enumerate(KEYWORDS.items()):
     keywords_mat[i, 0] = wc
     keywords_mat[i, 1:] = vec
 
-def baseline(words, return_all_class = False):
+def baseline(words, return_all_class = True):
     ''' words: list of strings
     return max_lb and max_sim if return_all_class = False
     else, return max similarity of words in each of the four bins
@@ -59,14 +59,17 @@ def bot():
         my_phrase = input('Enter your phrase for simulated result: ').lower()
         if my_phrase == 'exit()':
             break
-        words = my_phrase.replace('-', ' ').split(' ').lower()
+        words = my_phrase.replace('-', ' ').lower().split(' ')
         if len(words) > 4:
             print('try to keep your phrase more succinct.\n')
             continue
 
         ans = baseline(words)
         if ans is not None:
-            max_lb, max_sim = ans
+
+            max_sim = max(ans[1])
+            max_lb = ans[0][np.argmax(ans[1])]
+
             print("--> I think '{}' is the closest to '{}' (similarity {:.4f}), so it should go in {}\n".format(
                 my_phrase, KEYWORDS_rev[max_lb], max_sim, CATEGORIES[int(max_lb//10)]))
 
