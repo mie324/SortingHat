@@ -4,6 +4,7 @@ warnings.filterwarnings("ignore")
 import numpy as np
 from gensim.models import Word2Vec
 from scipy.spatial.distance import cosine
+import pandas as pd
 
 wv = Word2Vec.load('./data/w2v_wiki300').wv
 
@@ -26,30 +27,48 @@ for i, (phrase, wc) in enumerate(KEYWORDS.items()):
     keywords_mat[i, 0] = wc
     keywords_mat[i, 1:] = vec
 
-while True:
-    my_phrase = input('Enter your phrase for simulated result: ').lower()
-    if my_phrase == 'exit()':
-        break
-    words = my_phrase.split(' ')
-    if len(words) > 4:
-        print('try to keep your phrase more succinct.\n')
-        continue
-    my_vec= np.zeros(300)
-
+def baseline(words):
+    ''' words: list of strings '''
+    my_vec = np.zeros(300)
     for w in words:
         try:
             my_vec += wv[w]
         except KeyError:
             print("I don't know what {} means, sorry. Did you make a typo?\n".format(w))
             break
-    else: # no break
-        #compute max similarity
+    else:  # no break
+        # compute max similarity
         max_sim, max_lb = 0, -1
         for row in keywords_mat:
             sim = 1 - cosine(my_vec, row[1:])
             if sim > max_sim:
                 max_sim = sim
                 max_lb = row[0]
+    return max_lb, max_sim
+
+def bot():
+    while True:
+        my_phrase = input('Enter your phrase for simulated result: ').lower()
+        if my_phrase == 'exit()':
+            break
+        words = my_phrase.split(' ')
+        if len(words) > 4:
+            print('try to keep your phrase more succinct.\n')
+            continue
+        max_lb, max_sim = baseline(words)
 
         print("--> I think '{}' is the closest to '{}' (similarity {:.4f}), so it should go in {}\n".format(
             my_phrase, KEYWORDS_rev[max_lb], max_sim, CATEGORIES[int(max_lb//10)]))
+
+def evaluate_bot():
+    df = pd.read_csv('./data/waste_wizard.csv', columns=['words', 'cat'])
+    df = df[df['cat'] != 4]
+    X = df['words'].values
+    y = df['cat']
+
+def train_on_wv():
+    pass
+
+
+if __name__ == '__main__':
+    bot()

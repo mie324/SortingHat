@@ -12,7 +12,7 @@ import time
 # from torch.utils.data import DataLoader
 # from sklearn.model_selection import train_test_split
 
-from model import CNN
+from model import CNN, CNN_fourclass
 from util import *
 from result_visualization import *
 # from dataset import Dataset
@@ -20,19 +20,28 @@ from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+#print(device)
 def main(args):
+    print('debug is {} and fourclass is {}'.format(args.debug, args.fourclass))
     train_acc = np.zeros(args.epochs)
     train_loss = np.zeros(args.epochs)
     val_acc = np.zeros(args.epochs)
     val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(
-        args.batch_size, debug=args.debug, fourclass=args.fourclass)
+    stream = True
+    if stream:
+        train_loader, val_loader = stream_train_val_loader(
+            args.batch_size, debug=args.debug, fourclass=args.fourclass)
+    else:
+        train_loader, val_loader = get_train_val_loader(
+            args.batch_size, debug=args.debug, fourclass=args.fourclass)
     logging.info('loaders loaded')
 
-    model = CNN().to(device)
+    if not args.fourclass:
+        model = CNN().to(device)
+    else:
+        model = CNN_fourclass().to(device)
 
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -48,7 +57,7 @@ def main(args):
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
-
+            #print(inputs.get_device, labels.get_device)
             optimizer.zero_grad()
             predictions = model(inputs)
             #print(predictions.shape)
@@ -83,26 +92,12 @@ def main(args):
           'train accuracy:', max(train_acc), 'train loss:', min(train_loss), '\n',
           'validation accuracy:', max(val_acc), 'validation loss:', min(val_loss), '\n')
 
-    # plotting related
+    import re
+    localtime = time.asctime(time.localtime(time.time()))
+    path = 'training_gpu_' + re.sub(r':', '-', localtime[11:19])
     time_elapsed = time.time() - start_time
-
-    # torch.save(model, model_config + '_BEST88.pt')
-    #
-    # # Write the train/test loss/err into CSV file for plotting later
-    # indices = np.arange(1, step_length + 1)
-    #
-    # df = pd.DataFrame({"steps": indices, "train_acc": train_acc})
-    # df.to_csv("./csv/train_acc_{}.csv".format(model_config), index=False)
-    #
-    # df = pd.DataFrame({"steps": indices, "val_acc": val_acc})
-    # df.to_csv("./csv/val_acc_{}.csv".format(model_config), index=False)
-    #
-    # train_plot, val_plot = load_csv(model_config)
-    # plot_graph(model_config, train_plot, val_plot, eval_every)
-
-    # print("lr={}, batch_size={}, hidden_size={}, func={}".format(lr, batch_size, hidden_size, func))
-    # print("max validation accuracy:", max(val_acc))
-
+    steps = np.arange(1, args.epochs + 1)
+    plot_graph(path, steps, train_acc, val_acc)
     print("time elapsed:", time_elapsed)
 
     now = datetime.now()
