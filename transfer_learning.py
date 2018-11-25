@@ -5,6 +5,7 @@ import time
 from util import *
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
+from result_visualization import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -16,8 +17,8 @@ def main(args):
     val_loss = np.zeros(args.epochs)
 
     # Data processing
-    train_loader, val_loader = get_train_val_loader(
-        args.batch_size, debug=args.debug, fourclass=args.fourclass)
+    train_loader, val_loader = stream_train_val_loader(
+        args.batch_size, debug=args.debug, fourclass=args.fourclass, transfer=True)
     logging.info('loaders loaded')
 
     # ==============+++++++++++===============+++++++++++===============+++++++++++===============+++++++++++
@@ -29,13 +30,21 @@ def main(args):
         param.requires_grad = False
     num_inputs = inception.fc.in_features
     inception.fc = nn.Linear(num_inputs, 4 if args.fourclass else 11)
-    # ==============+++++++++++===============+++++++++++===============+++++++++++===============+++++++++++
-    # ==============+++++++++++===============+++++++++++===============+++++++++++===============+++++++++++
-
     model = inception.to(device)
 
+    # resnet = models.resnet18(pretrained=True)
+    # for param in resnet.parameters():
+    #     param.requires_grad = False
+    # num_inputs = resnet.fc.in_features
+    # resnet.fc = nn.Linear(num_inputs, 4 if args.fourclass else 11)
+    # model = resnet.to(device)
+    # ==============+++++++++++===============+++++++++++===============+++++++++++===============+++++++++++
+    # ==============+++++++++++===============+++++++++++===============+++++++++++===============+++++++++++
+
+
+
     loss_fcn = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.fc.parameters(), lr=args.lr)  # changed for transfer learning
 
     logging.info('good sofar')
     start_time = time.time()
@@ -50,10 +59,11 @@ def main(args):
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            predictions = model(inputs)
+            predictions, aux = model(inputs)
             #print(predictions.shape)
-            loss = loss_fcn(predictions, labels.long())
-
+            loss1 = loss_fcn(predictions, labels.long())
+            loss2 = loss_fcn(aux, labels.long())
+            loss = loss1 + loss2
             # magic
             loss.backward()
             optimizer.step()
@@ -86,6 +96,11 @@ def main(args):
     # plotting related
     time_elapsed = time.time() - start_time
     print("time elapsed:", time_elapsed)
+    import re
+    localtime = time.asctime(time.localtime(time.time()))
+    path = 'transfer_learning_' + re.sub(r':', '-', localtime[11:19])
+    steps = np.arange(1, args.epochs + 1)
+    plot_graph(path, steps, train_acc, val_acc)
 
     now = datetime.now()
     torch.save(model, 'model_{:02d}{:02d}_{:02d}{:02d}.pt'.format(now.month, now.day, now.hour, now.minute))
@@ -107,15 +122,14 @@ def evaluate(model, val_loader, loss_fcn, epoch, gen_conf_mat=True, fourclass=Fa
         _ , predicted = torch.max(predictions, 1)
         loss = loss_fcn(predictions, labels.long())
 
-        y_true.extend(labels.tolist())
-        y_pred.extend(predicted.tolist())
-
         corr = (predicted == labels.long()).sum().item()
         total_corr += corr
 
         accum_loss += loss.item()
 
     if gen_conf_mat and epoch%10==9:
+        y_true.extend(labels.tolist())
+        y_pred.extend(predicted.tolist())
         cm = confusion_matrix(y_true, y_pred)
         cls_itos = CLASSES4_itos if fourclass else CLASSES_itos
         plot_confusion_matrix('debug{}'.format(epoch+1), cm, cls_itos)

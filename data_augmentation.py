@@ -33,21 +33,21 @@ for fd in ['juicebox']:
                 im = Image.open(filename)
 
                 #image_list.append(Std_crop(im))
-                # try:
-                #     for i in range(4):
-                #         imafterjit = Jitter(im)
-                #         for j in range(2):
-                #             imafteraf = Affine(imafterjit)
-                #             for k in range(5):
-                #                 img = Crop(imafteraf)
-                #                 imgcount += 1
-                #                 if imgcount % 100 == 1:
-                #                     logging.info('--at {}st image'.format(imgcount))
-                #                 img.save('./data/{}/{}{}.png'.format(fd, fd, imgcount))
                 try:
-                    img = Affine(im)
-                    imgcount += 1
-                    img.save('./data/{}/{}{}.png'.format(fd, fd, imgcount))
+                    for i in range(4):
+                        imafterjit = Jitter(im)
+                        for j in range(2):
+                            imafteraf = Affine(imafterjit)
+                            for k in range(5):
+                                img = Crop(imafteraf)
+                                imgcount += 1
+                                if imgcount % 100 == 1:
+                                    logging.info('--at {}st image'.format(imgcount))
+                                img.save('./data/{}/{}{}.png'.format(fd, fd, imgcount))
+                # try:
+                #     img = Affine(im)
+                #     imgcount += 1
+                #     img.save('./data/{}/{}{}.png'.format(fd, fd, imgcount))
 
                 except ValueError as e:
                     errcount += 1

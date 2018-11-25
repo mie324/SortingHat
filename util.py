@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
+from re import sub
 import logging
 logging.basicConfig(
     format='%(asctime)s : %(levelname)s : %(message)s',
@@ -43,39 +44,56 @@ class WasteDatasetStream(Dataset):
     Trying to stream data from disk instead of storing everything in memory
     '''
 
-    def __init__(self, IDs, numpics, fourclass=False):
+    def __init__(self, IDs, numpics, fourclass=False, transfer=False):
         self.IDs = IDs  # a dictionary {classname: [ids]... } where ids contains only good pictures
-        self.numpics = numpics
+        self.numpics = numpics  # per class
         self.classes_itos = CLASSES4_itos if fourclass else CLASSES_itos
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        self.fourclass = fourclass
+        if not transfer:
+            self.transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        else:
+            self.transform = transforms.Compose([
+                transforms.Resize(299), # 299 for inception / 224 for resnet
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     def __len__(self):
-        return len(self.IDs) * self.numpics
+        ncls = 4 if self.fourclass else 11
+        return ncls * self.numpics
 
     def __getitem__(self, index):
         clscode, localindex = index // self.numpics, index % self.numpics
 
         picnum = self.IDs[clscode][localindex]
-        clsname = self.classes_itos[clscode]
-        filename = './data/{}/{}{}.png'.format(clsname, clsname, picnum)
+        if not self.fourclass:
+            clsname = self.classes_itos[clscode]
+            filename = './data/{}/{}{}.png'.format(clsname, clsname, picnum)
+        else:
+            clsname = sub(r"[^A-Za-z]+", '', picnum)  # keep alphabetic portion of string.
+            # (in fourclass, picnum is a string that include the class name)
+            filename = './data/{}/{}.png'.format(clsname, picnum)
         im = Image.open(filename)
         imtensor = self.transform(im)
+        try:
+            assert imtensor.shape == (3,128,128)
+        except AssertionError:
+            print('ASSERTION EROR, ', imtensor.shape)
 
         return imtensor, clscode
 
 
-def stream_train_val_loader(bs=64, debug=False, fourclass=False):
+def stream_train_val_loader(bs=64, debug=False, fourclass=False, transfer=False):
 
     if not fourclass:
         num_data = 1000 if debug else 8000
     else:
         num_data = 2000 if debug else 16000
-
+    print('num_data = {}'.format(num_data))
     classes = CLASSES4 if fourclass else CLASSES
 
-    clscode_to_numsample = [num_data // 4, num_data // 5, num_data // 2, num_data]  # used if fourclass
+    clscode_to_numsample = [num_data // 4, num_data // 5, num_data // 2, num_data]  # used for fourclass
 
     train_IDs = {}
     val_IDs = {}
@@ -85,18 +103,30 @@ def stream_train_val_loader(bs=64, debug=False, fourclass=False):
         goodindices = []
         for fname in os.listdir('./data/{}'.format(clsname)):
             if '_bad' not in fname:
-                goodindices.append( os.path.splitext(fname)[0].split(clsname)[1] ) # extract index
+                if fourclass:
+                    goodindices.append( os.path.splitext(fname)[0] ) # extract index
+                else:
+                    goodindices.append( os.path.splitext(fname)[0].split(clsname)[1] )
 
         rnd_sample = np.random.permutation(goodindices)
-        train_IDs[clscode], val_IDs[clscode] = rnd_sample[:int(num_data*0.8)], rnd_sample[int(num_data*0.8):num_data]
 
-    train_loader = DataLoader(WasteDatasetStream(train_IDs, int(num_data*0.8), fourclass=fourclass), batch_size=bs, shuffle=False)
-    val_loader = DataLoader(WasteDatasetStream(val_IDs, int(num_data*0.2), fourclass=fourclass), batch_size=bs, shuffle=False)
+        if fourclass and clscode in train_IDs:
+            train_IDs[clscode] = np.concatenate( (train_IDs[clscode], rnd_sample[:int(numsample*0.8)]) )
+            val_IDs[clscode] = np.concatenate( (val_IDs[clscode], rnd_sample[int(numsample*0.8):numsample] ) )
+        else:
+            train_IDs[clscode], val_IDs[clscode] = rnd_sample[:int(numsample * 0.8)], rnd_sample[int(numsample * 0.8):numsample]
+
+    print(len(train_IDs[0]), len(train_IDs[1]), len(train_IDs[2]), len(train_IDs[3]))
+    train_loader = DataLoader(WasteDatasetStream(train_IDs, int(num_data*0.8), fourclass=fourclass, transfer=transfer),
+                              batch_size=bs, shuffle=True, num_workers=1)
+    val_loader = DataLoader(WasteDatasetStream(val_IDs, int(num_data*0.2), fourclass=fourclass, transfer=transfer),
+                            batch_size=bs, shuffle=False, num_workers=1)
     logging.info('loaders generated')
     return train_loader, val_loader
 
 
-def _get_train_val_loader(bs=64, debug=False, fourclass=False):
+
+def get_train_val_loader(bs=64, debug=False, fourclass=False):
     '''
     kills memory
     '''
@@ -126,10 +156,13 @@ def _get_train_val_loader(bs=64, debug=False, fourclass=False):
         for fnum in rnd_sample:  #0 -- 7999
 
             filename = './data/{}/{}{}.png'.format(clsname, clsname, fnum)
-            im = Image.open(filename)
-            imtensor = transform(im)
-            if imtensor.shape != (3,128,128):
+            try:
+                im = Image.open(filename)
+            except FileNotFoundError:
                 continue
+            imtensor = transform(im)
+            # if imtensor.shape != (3,128,128):
+            #     continue
 
             if success < numsample*0.8:
                 train_tensors.append(imtensor)
