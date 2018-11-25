@@ -76,10 +76,10 @@ class WasteDatasetStream(Dataset):
             filename = './data/{}/{}.png'.format(clsname, picnum)
         im = Image.open(filename)
         imtensor = self.transform(im)
-        try:
-            assert imtensor.shape == (3,128,128)
-        except AssertionError:
-            print('ASSERTION EROR, ', imtensor.shape)
+        # try:
+        #     assert imtensor.shape == (3,128,128)
+        # except AssertionError:
+        #     print('ASSERTION EROR, ', imtensor.shape)
 
         return imtensor, clscode
 
