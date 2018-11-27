@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch
 
 
-class MLP(nn.Module):
+class NLP(nn.Module):
     def __init__(self):
-        super(MLP, self).__init__()
+        super(NLP, self).__init__()
         self.fc1 = nn.Linear(H1)
         self.fc2 = nn.Linear(H1, 4)
 
