@@ -3,15 +3,29 @@ import torch.nn as nn
 from nlp_model import NLP
 from util import *
 from result_visualization import *
-
+import pandas as pd
+from dataset import NLPDataset
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+def get_loaders(bs):
+    df = pd.read_csv('./data/waste_wizard.csv')
+    df = df[df['label'] != 4]
+    dftrain = df[df.index %5 != 0]
+    dfval = df[df.index %5 == 0]
+    train_loader = DataLoader(NLPDataset(dftrain['words'], dftrain['label']), batch_size=bs, shuffle=True)
+    val_loader = DataLoader(NLPDataset(dfval['words'], dfval['label']), batch_size=bs, shuffle=False)
+    return train_loader, val_loader
 
 def main():
+    bs = 16
     epochs = 10
+    lr = 0.01
+    train_loader, val_loader = get_loaders(bs)
+
+
     model = NLP()
     loss_fcn = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     train_acc = np.zeros(epochs)
     train_loss = np.zeros(epochs)
     val_acc = np.zeros(epochs)
