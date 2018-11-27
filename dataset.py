@@ -1,21 +1,23 @@
 import torch.utils.data as data
+from gensim import Word2Vec
+import numpy as np
 
-
-class Dataset(data.Dataset):
+class NLP_Dataset(data.Dataset):
     '''
-    deprecated. implemented in util.py
+    NLP Dataset
     '''
-    def __init__(self, IDs, numpics):
-        self.IDs = IDs  # a dictionary {classname: [ids]... } where ids contains only good pictures
-        self.numpics = numpics
+    def __init__(self, words, labels):
+        self.wv = word2Vec.load('./data/w2v_wiki300').wv
+        for i, w in enumerate(words):
+            if w not in wv:
+                words.pop(i)
+                labels.pop(i)
+        self.X = wv[np.array(words)]
+        self.y = np.array(labels)
 
     def __len__(self):
-        return len(self.IDs)*self.numpics
+        return len(y)
 
     def __getitem__(self, index):
-        y, localindex = index // self.numpics, index % self.numpics
-
-        picnum = self.IDs[y][localindex]
-
-        return X, y
+        return self.X[index], self.y[index]
 
