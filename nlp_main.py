@@ -64,8 +64,11 @@ def main():
           'train accuracy:', max(train_acc), 'train loss:', min(train_loss), '\n',
           'validation accuracy:', max(val_acc), 'validation loss:', min(val_loss), '\n')
 
-
+    import re
+    import time
     steps = np.arange(1, epochs + 1)
+    localtime = time.asctime(time.localtime(time.time()))
+    path = 'nlp_main_' + re.sub(r':', '-', localtime[11:19])
     plot_graph(path, steps, train_acc, val_acc)
 
 
