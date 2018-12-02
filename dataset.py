@@ -1,13 +1,13 @@
 import torch.utils.data as data
-from gensim import Word2Vec
+
 import numpy as np
 
 class NLPDataset(data.Dataset):
     '''
     NLP Dataset
     '''
-    def __init__(self, phrases, labels):
-        self.wv = Word2Vec.load('./data/w2v_wiki300').wv
+    def __init__(self, wv, phrases, labels):
+        self.wv = wv
         X_ = []
         y_ = []
         for i, (phrase, label) in enumerate(zip(phrases, labels)):

@@ -4,7 +4,8 @@ from nlp_model import NLP
 from util import *
 from result_visualization import *
 import pandas as pd
-from dataset import NLPDataset
+import dataset
+from gensim.models import Word2Vec
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def get_loaders(bs):
@@ -12,24 +13,24 @@ def get_loaders(bs):
     df = df[df['label'] != 4]
     dftrain = df[df.index %5 != 0]
     dfval = df[df.index %5 == 0]
-    train_loader = DataLoader(NLPDataset(dftrain['words'], dftrain['label']), batch_size=bs, shuffle=True)
-    val_loader = DataLoader(NLPDataset(dfval['words'], dfval['label']), batch_size=bs, shuffle=False)
+    wv = Word2Vec.load('./data/w2v_wiki300').wv
+    train_loader = DataLoader(dataset.NLPDataset(wv, dftrain['words'], dftrain['label']), batch_size=bs, shuffle=True)
+    val_loader = DataLoader(dataset.NLPDataset(wv, dfval['words'], dfval['label']), batch_size=bs, shuffle=False)
     return train_loader, val_loader
 
 def main():
     bs = 16
-    epochs = 10
-    lr = 0.01
+    epochs = 40
+    lr = 0.001
     train_loader, val_loader = get_loaders(bs)
 
 
     model = NLP()
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    train_acc = np.zeros(epochs)
-    train_loss = np.zeros(epochs)
-    val_acc = np.zeros(epochs)
-    val_loss = np.zeros(epochs)
+    train_accs = np.zeros(epochs)
+
+    val_accs = np.zeros(epochs)
     for epoch in range(epochs):
         accum_loss = 0.0
         num_trained = 0
@@ -38,8 +39,10 @@ def main():
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
+
             optimizer.zero_grad()
             predictions = model(inputs)
+            # print(predictions)
             loss = loss_fcn(predictions, labels.long())
 
             # magic
@@ -49,6 +52,7 @@ def main():
             # count correct predictions
             accum_loss += loss.item()
             _, predicted = torch.max(predictions, 1)
+            # print(predicted)
             corr = (predicted == labels.long()).sum().item()
             tot_corr += corr
 
@@ -56,20 +60,22 @@ def main():
 
         # Print statistics
         valid_acc, valid_loss = evaluate(model.eval(), val_loader, loss_fcn)
+        train_accs[epoch]= tot_corr/num_trained
+        val_accs[epoch]= valid_acc
 
-        logging.info('epoch %d, loss: %f, training acc: %f%%, validation acc: %f%%' %
-                     (epoch + 1, train_loss[epoch], train_acc[epoch], val_acc[epoch]))
+        logging.info('epoch %d, training acc: %f%%, validation acc: %f%%' %
+                     (epoch + 1, train_accs[epoch], val_accs[epoch]))
 
-    print('Finished training:\n',
-          'train accuracy:', max(train_acc), 'train loss:', min(train_loss), '\n',
-          'validation accuracy:', max(val_acc), 'validation loss:', min(val_loss), '\n')
+    # print('Finished training:\n',
+    #       'train accuracy:', max(train_acc), 'train loss:', min(train_loss), '\n',
+    #       'validation accuracy:', max(val_acc), 'validation loss:', min(val_loss), '\n')
 
     import re
     import time
     steps = np.arange(1, epochs + 1)
     localtime = time.asctime(time.localtime(time.time()))
     path = 'nlp_main_' + re.sub(r':', '-', localtime[11:19])
-    plot_graph(path, steps, train_acc, val_acc)
+    plot_graph(path, steps, train_accs, val_accs)
 
 
 def evaluate(model, val_loader, loss_fcn):
